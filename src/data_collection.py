@@ -2,7 +2,44 @@ import fastf1
 import pandas as pd
 from pathlib import Path
 
+CACHE_DIR = Path(__file__).resolve().parent.parent / "data" / "fastf1_cache"
+
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+fastf1.Cache.enable_cache(CACHE_DIR)
+
+def save_if_not_exists(df, output_file, dataset_name):
+    if output_file.exists():
+        print(f"{dataset_name} already exists. Skipping.")
+    else:
+        df.to_csv(output_file, index=False)
+        print(f"{dataset_name} saved to {output_file}")
+
+def race_data_exists(year, event):
+    filename = f"{year}_{event.lower().replace(' ', '_')}.csv"
+
+    folders = [
+        "race_results",
+        "qualifying",
+        "laps",
+        "stints",
+        "pit_stops",
+        "weather"
+    ]
+
+    base_dir = Path(__file__).resolve().parent.parent / "data" / "raw"
+
+    return all(
+        (base_dir / folder / filename).exists()
+        for folder in folders
+    )
+
 def collect_race_data(year, event):
+
+    if race_data_exists(year, event):
+        print(f"All data already exists for {year} {event}. Skipping.")
+        return
+
     print(f"Collecting data for {year} {event}")
 
     # RACE DATA
@@ -19,9 +56,11 @@ def collect_race_data(year, event):
 
     output_file = output_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
 
-    race_results.to_csv(output_file, index=False)
-
-    print(f"Race results saved to {output_file}")
+    save_if_not_exists(
+    race_results,
+    output_file,
+    "Race results"
+    )
 
     # QUALIFYING DATA
 
@@ -37,9 +76,11 @@ def collect_race_data(year, event):
 
     qualifying_file = qualifying_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
 
-    qualifying_results.to_csv(qualifying_file, index=False)
-
-    print(f"Qualifying results saved to {qualifying_file}")
+    save_if_not_exists(
+    qualifying_results,
+    qualifying_file,
+    "Qualifying results"
+    )
 
     # -------------------------
     # LAP DATA
@@ -54,9 +95,11 @@ def collect_race_data(year, event):
 
     laps_file = laps_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
 
-    laps.to_csv(laps_file, index=False)
-
-    print(f"Lap data saved to {laps_file}")
+    save_if_not_exists(
+    laps,
+    laps_file,
+    "Lap data"
+    )
 
 
     # -------------------------
@@ -84,7 +127,11 @@ def collect_race_data(year, event):
 
     stints_file = stints_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
 
-    stints.to_csv(stints_file, index=False)
+    save_if_not_exists(
+    stints,
+    stints_file,
+    "Stint data"
+    )
 
     # -------------------------
     # PIT STOP DATA
@@ -103,7 +150,11 @@ def collect_race_data(year, event):
 
     pit_stops_file = pit_stops_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
 
-    pit_stops.to_csv(pit_stops_file, index=False)
+    save_if_not_exists(
+    pit_stops,
+    pit_stops_file,
+    "Pit stop data"
+    )
 
     # -------------------------
     # WEATHER DATA
@@ -118,8 +169,34 @@ def collect_race_data(year, event):
 
     weather_file = weather_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
 
-    weather.to_csv(weather_file, index=False)
+    save_if_not_exists(
+    weather,
+    weather_file,
+    "Weather data"
+    )
 
 
 if __name__ == "__main__":
-    collect_race_data(2025, "British")
+if __name__ == "__main__":
+
+    for year in range(2020, 2026):
+
+        print("\n" + "=" * 60)
+        print(f"STARTING SEASON {year}")
+        print("=" * 60)
+
+        schedule = fastf1.get_event_schedule(year)
+
+        schedule = schedule[schedule["RoundNumber"] > 0]
+
+        for _, event in schedule.iterrows():
+
+            try:
+                collect_race_data(
+                    year,
+                    event["EventName"]
+                )
+
+            except Exception as e:
+                print(f"ERROR: Could not collect {event['EventName']} {year}")
+                print(f"Reason: {e}")

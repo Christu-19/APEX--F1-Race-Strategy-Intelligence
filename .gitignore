@@ -21,3 +21,9 @@ Thumbs.db
 
 # VS Code temporary files
 tempCodeRunnerFile.py
+
+# Raw F1 data
+data/raw/
+
+# Processed data
+data/processed/
