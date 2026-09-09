@@ -1,6 +1,7 @@
 import fastf1
 import pandas as pd
 from pathlib import Path
+import time
 
 CACHE_DIR = Path(__file__).resolve().parent.parent / "data" / "fastf1_cache"
 
@@ -34,7 +35,7 @@ def race_data_exists(year, event):
         for folder in folders
     )
 
-def collect_race_data(year, event):
+def collect_race_data(year, round_number, event):
 
     if race_data_exists(year, event):
         print(f"All data already exists for {year} {event}. Skipping.")
@@ -42,141 +43,245 @@ def collect_race_data(year, event):
 
     print(f"Collecting data for {year} {event}")
 
-    # RACE DATA
+    # -------------------------
+    # RACE SESSION
+    # -------------------------
 
-    race = fastf1.get_session(year, event, "R")
-    race.load()
+    race = fastf1.get_session(year, round_number, "R")
 
-    print("Race session loaded successfully!")
+    try:
+        race.load(
+            laps=True,
+            telemetry=False,
+            weather=True
+        )
+        print("Race session loaded successfully!")
 
-    race_results = race.results
+    except Exception as e:
+        print(f"ERROR: Race session could not be loaded for {year} {event}")
+        print(f"Reason: {e}")
+        race = None
 
-    output_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "race_results"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # -------------------------
+    # RACE RESULTS
+    # -------------------------
 
-    output_file = output_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
+    if race is not None:
 
-    save_if_not_exists(
-    race_results,
-    output_file,
-    "Race results"
-    )
+        try:
+            race_results = race.results
 
+            output_dir = (
+                Path(__file__).resolve().parent.parent
+                / "data" / "raw" / "race_results"
+            )
+
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            output_file = (
+                output_dir
+                / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            )
+
+            save_if_not_exists(
+                race_results,
+                output_file,
+                "Race results"
+            )
+
+        except Exception as e:
+            print(f"ERROR: Could not collect race results for {year} {event}")
+            print(f"Reason: {e}")
+
+    # -------------------------
     # QUALIFYING DATA
+    # -------------------------
 
-    qualifying = fastf1.get_session(year, event, "Q")
-    qualifying.load()
+    qualifying = fastf1.get_session(year, round_number, "Q")
 
-    print("Qualifying session loaded successfully!")
+    try:
+        qualifying.load(
+            laps=False,
+            telemetry=False,
+            weather=False
+        )
+        print("Qualifying session loaded successfully!")
 
-    qualifying_results = qualifying.results
+        qualifying_results = qualifying.results
 
-    qualifying_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "qualifying"
-    qualifying_dir.mkdir(parents=True, exist_ok=True)
+        qualifying_dir = (
+            Path(__file__).resolve().parent.parent
+            / "data" / "raw" / "qualifying"
+        )
 
-    qualifying_file = qualifying_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
+        qualifying_dir.mkdir(parents=True, exist_ok=True)
 
-    save_if_not_exists(
-    qualifying_results,
-    qualifying_file,
-    "Qualifying results"
-    )
+        qualifying_file = (
+            qualifying_dir
+            / f"{year}_{event.lower().replace(' ', '_')}.csv"
+        )
+
+        save_if_not_exists(
+            qualifying_results,
+            qualifying_file,
+            "Qualifying results"
+        )
+
+    except Exception as e:
+        print(f"ERROR: Could not collect qualifying for {year} {event}")
+        print(f"Reason: {e}")
 
     # -------------------------
     # LAP DATA
     # -------------------------
 
-    laps = race.laps
+    laps = None
 
-    print("Lap data collected!")
+    if race is not None:
 
-    laps_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "laps"
-    laps_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            laps = race.laps
+            print("Lap data collected!")
 
-    laps_file = laps_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            laps_dir = (
+                Path(__file__).resolve().parent.parent
+                / "data" / "raw" / "laps"
+            )
 
-    save_if_not_exists(
-    laps,
-    laps_file,
-    "Lap data"
-    )
+            laps_dir.mkdir(parents=True, exist_ok=True)
 
+            laps_file = (
+                laps_dir
+                / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            )
+
+            save_if_not_exists(
+                laps,
+                laps_file,
+                "Lap data"
+            )
+
+        except Exception as e:
+            print(f"ERROR: Lap data could not be accessed for {year} {event}")
+            print(f"Reason: {e}")
 
     # -------------------------
     # STINT DATA
     # -------------------------
 
-    stints = (
-        laps
-        .groupby(["Driver", "Stint", "Compound"], dropna=False)
-        .agg(
-            StartLap=("LapNumber", "min"),
-            EndLap=("LapNumber", "max"),
-            StintLaps=("LapNumber", "count"),
-            AverageLapTime=("LapTime", "mean"),
-            FastestLapTime=("LapTime", "min"),
-            AverageTyreLife=("TyreLife", "mean")
-        )
-        .reset_index()
-    )
+    if laps is not None:
 
-    print("Stint data created!")
+        try:
+            stints = (
+                laps
+                .groupby(
+                    ["Driver", "Stint", "Compound"],
+                    dropna=False
+                )
+                .agg(
+                    StartLap=("LapNumber", "min"),
+                    EndLap=("LapNumber", "max"),
+                    StintLaps=("LapNumber", "count"),
+                    AverageLapTime=("LapTime", "mean"),
+                    FastestLapTime=("LapTime", "min"),
+                    AverageTyreLife=("TyreLife", "mean")
+                )
+                .reset_index()
+            )
 
-    stints_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "stints"
-    stints_dir.mkdir(parents=True, exist_ok=True)
+            print("Stint data created!")
 
-    stints_file = stints_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            stints_dir = (
+                Path(__file__).resolve().parent.parent
+                / "data" / "raw" / "stints"
+            )
 
-    save_if_not_exists(
-    stints,
-    stints_file,
-    "Stint data"
-    )
+            stints_dir.mkdir(parents=True, exist_ok=True)
+
+            stints_file = (
+                stints_dir
+                / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            )
+
+            save_if_not_exists(
+                stints,
+                stints_file,
+                "Stint data"
+            )
+
+        except Exception as e:
+            print(f"ERROR: Could not create stint data for {year} {event}")
+            print(f"Reason: {e}")
 
     # -------------------------
     # PIT STOP DATA
     # -------------------------
 
-    pit_stops = laps[
-        laps["PitInTime"].notna()
-    ][
-        ["Driver", "LapNumber", "PitInTime", "PitOutTime"]
-    ].copy()
+    if laps is not None:
 
-    print("Pit stop data collected!")
+        try:
+            pit_stops = laps[
+                laps["PitInTime"].notna()
+            ][
+                ["Driver", "LapNumber", "PitInTime", "PitOutTime"]
+            ].copy()
 
-    pit_stops_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "pit_stops"
-    pit_stops_dir.mkdir(parents=True, exist_ok=True)
+            print("Pit stop data collected!")
 
-    pit_stops_file = pit_stops_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            pit_stops_dir = (
+                Path(__file__).resolve().parent.parent
+                / "data" / "raw" / "pit_stops"
+            )
 
-    save_if_not_exists(
-    pit_stops,
-    pit_stops_file,
-    "Pit stop data"
-    )
+            pit_stops_dir.mkdir(parents=True, exist_ok=True)
+
+            pit_stops_file = (
+                pit_stops_dir
+                / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            )
+
+            save_if_not_exists(
+                pit_stops,
+                pit_stops_file,
+                "Pit stop data"
+            )
+
+        except Exception as e:
+            print(f"ERROR: Could not create pit stop data for {year} {event}")
+            print(f"Reason: {e}")
 
     # -------------------------
     # WEATHER DATA
     # -------------------------
 
-    weather = race.weather_data
+    if race is not None:
 
-    print("Weather data collected!")
+        try:
+            weather = race.weather_data
+            print("Weather data collected!")
 
-    weather_dir = Path(__file__).resolve().parent.parent / "data" / "raw" / "weather"
-    weather_dir.mkdir(parents=True, exist_ok=True)
+            weather_dir = (
+                Path(__file__).resolve().parent.parent
+                / "data" / "raw" / "weather"
+            )
 
-    weather_file = weather_dir / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            weather_dir.mkdir(parents=True, exist_ok=True)
 
-    save_if_not_exists(
-    weather,
-    weather_file,
-    "Weather data"
-    )
+            weather_file = (
+                weather_dir
+                / f"{year}_{event.lower().replace(' ', '_')}.csv"
+            )
 
+            save_if_not_exists(
+                weather,
+                weather_file,
+                "Weather data"
+            )
 
-if __name__ == "__main__":
+        except Exception as e:
+            print(f"ERROR: Could not collect weather for {year} {event}")
+            print(f"Reason: {e}")
+
 if __name__ == "__main__":
 
     for year in range(2020, 2026):
@@ -185,18 +290,53 @@ if __name__ == "__main__":
         print(f"STARTING SEASON {year}")
         print("=" * 60)
 
-        schedule = fastf1.get_event_schedule(year)
+        schedule = None
 
-        schedule = schedule[schedule["RoundNumber"] > 0]
+        for attempt in range(1, 4):
+            try:
+                print(
+                    f"Loading {year} schedule "
+                    f"(attempt {attempt}/3)..."
+                )
+
+                schedule = fastf1.get_event_schedule(year)
+                schedule = schedule[
+                    schedule["RoundNumber"] > 0
+                ]
+
+                print(f"{year} schedule loaded successfully!")
+                break
+
+            except Exception as e:
+                print(
+                    f"Schedule attempt {attempt} "
+                    f"failed for {year}."
+                )
+                print(f"Reason: {e}")
+
+                time.sleep(10)
+
+        if schedule is None:
+            print(
+                f"ERROR: Could not load schedule "
+                f"for {year} after 3 attempts."
+            )
+            continue
 
         for _, event in schedule.iterrows():
 
             try:
                 collect_race_data(
                     year,
+                    event["RoundNumber"],
                     event["EventName"]
                 )
 
             except Exception as e:
-                print(f"ERROR: Could not collect {event['EventName']} {year}")
+                print(
+                    f"ERROR: Could not collect "
+                    f"{event['EventName']} {year}"
+                )
                 print(f"Reason: {e}")
+
+            time.sleep(30)
