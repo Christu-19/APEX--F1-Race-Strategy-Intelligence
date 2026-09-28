@@ -166,7 +166,10 @@ def clean_race_results(df):
             "BroadcastName",
             "TeamColor",
             "HeadshotUrl",
-            "CountryCode"
+            "CountryCode",
+            "Q1",
+            "Q2",
+            "Q3"
         ]
     )
 
