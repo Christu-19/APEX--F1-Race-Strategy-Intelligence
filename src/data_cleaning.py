@@ -157,6 +157,28 @@ def combine_qualifying_results():
     print(f"Columns: {len(qualifying_df.columns)}")
     print(f"Saved to: {output_file}")
 
+def clean_qualifying_results(df):
+    cleaned_df = df.copy()
+
+    # Convert qualifying lap times from timedelta strings to seconds
+    for col in ["Q1", "Q2", "Q3"]:
+        cleaned_df[col] = pd.to_timedelta(
+            cleaned_df[col],
+            errors="coerce"
+        ).dt.total_seconds()
+
+    # Remove metadata that is not needed for analysis
+    cleaned_df = cleaned_df.drop(
+        columns=[
+            "BroadcastName",
+            "TeamColor",
+            "HeadshotUrl",
+            "CountryCode"
+        ]
+    )
+
+    return cleaned_df
+
 def clean_race_results(df):
 
     cleaned_df = df.copy()
@@ -195,6 +217,27 @@ if __name__ == "__main__":
         index=False
     )
 
+    master_qualifying_df = pd.read_csv(
+        PROCESSED_DATA_DIR / "master_qualifying_results.csv"
+    )
+
+    cleaned_qualifying_df = clean_qualifying_results(
+        master_qualifying_df
+    )
+
+    qualifying_file = (
+        PROCESSED_DATA_DIR / "cleaned_qualifying_results.csv"
+    )
+
+    cleaned_qualifying_df.to_csv(
+        qualifying_file,
+        index=False
+    )
+
+    print("\nCleaned qualifying dataset created.")
+    print(f"Shape: {cleaned_qualifying_df.shape}")
+    print(f"Saved to: {qualifying_file}")
+
     print("\nCleaned dataset created.")
     print(f"Shape: {cleaned_df.shape}")
     print(f"Saved to: {cleaned_file}")
@@ -202,59 +245,3 @@ if __name__ == "__main__":
 qualifying_df = pd.read_csv(
     PROCESSED_DATA_DIR / "master_qualifying_results.csv"
 )
-
-print("\n" + "=" * 60)
-print("QUALIFYING RECORDS BY YEAR")
-print("=" * 60)
-
-print(
-    qualifying_df.groupby("Year").size()
-)
-
-print("\n" + "=" * 60)
-print("QUALIFYING RECORDS BY YEAR AND RACE")
-print("=" * 60)
-
-print(
-    qualifying_df.groupby(
-        ["Year", "Race"]
-    ).size()
-)
-
-race_df = pd.read_csv(
-    PROCESSED_DATA_DIR / "master_race_results.csv"
-)
-
-print("\n" + "=" * 60)
-print("RACE RECORDS BY YEAR")
-print("=" * 60)
-
-print(
-    race_df.groupby("Year").size()
-)
-
-print("\n" + "=" * 60)
-print("NUMBER OF RACES BY YEAR")
-print("=" * 60)
-
-print(
-    race_df.groupby("Year")["Race"].nunique()
-)
-
-print("\n" + "=" * 60)
-print("RACES COLLECTED BY YEAR")
-print("=" * 60)
-
-for year in sorted(race_df["Year"].unique()):
-
-    print(f"\n{year}")
-
-    races = sorted(
-        race_df.loc[
-            race_df["Year"] == year,
-            "Race"
-        ].unique()
-    )
-
-    for race in races:
-        print(f"  - {race}")
