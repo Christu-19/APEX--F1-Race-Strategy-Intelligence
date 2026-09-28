@@ -11,10 +11,20 @@ fastf1.Cache.enable_cache(CACHE_DIR)
 
 def save_if_not_exists(df, output_file, dataset_name):
     if output_file.exists():
-        print(f"{dataset_name} already exists. Skipping.")
-    else:
-        df.to_csv(output_file, index=False)
-        print(f"{dataset_name} saved to {output_file}")
+        try:
+            existing_df = pd.read_csv(output_file)
+
+            if len(existing_df) > 0:
+                print(f"{dataset_name} already exists. Skipping.")
+                return
+
+            print(f"{dataset_name} exists but is empty. Replacing it.")
+
+        except Exception:
+            print(f"{dataset_name} could not be read. Replacing it.")
+
+    df.to_csv(output_file, index=False)
+    print(f"{dataset_name} saved to {output_file}")
 
 def race_data_exists(year, event):
     filename = f"{year}_{event.lower().replace(' ', '_')}.csv"
@@ -28,13 +38,28 @@ def race_data_exists(year, event):
         "weather"
     ]
 
-    base_dir = Path(__file__).resolve().parent.parent / "data" / "raw"
-
-    return all(
-        (base_dir / folder / filename).exists()
-        for folder in folders
+    base_dir = (
+        Path(__file__).resolve().parent.parent
+        / "data"
+        / "raw"
     )
 
+    for folder in folders:
+        file_path = base_dir / folder / filename
+
+        if not file_path.exists():
+            return False
+
+        try:
+            df = pd.read_csv(file_path)
+
+            if len(df) == 0:
+                return False
+
+        except Exception:
+            return False
+
+    return True
 def collect_race_data(year, round_number, event):
 
     if race_data_exists(year, event):
@@ -339,4 +364,4 @@ if __name__ == "__main__":
                 )
                 print(f"Reason: {e}")
 
-            time.sleep(30)
+            time.sleep(5)
