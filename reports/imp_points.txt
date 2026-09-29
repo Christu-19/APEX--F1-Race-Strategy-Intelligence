@@ -1,0 +1,26 @@
+Project: APEX — Race Strategy Intelligence.
+Goal: Predict F1 race finishing position using pre-race information.
+Data source: FastF1, covering 2020–2025 and 131 races.
+Raw data: Race results, qualifying, laps, stints, pit stops, and weather.
+Raw vs processed: Raw data is preserved; cleaned/engineered data is stored separately.
+Missing values: Investigated based on meaning instead of blindly replacing them.
+Qualifying missing Q2/Q3: Often structurally missing due to driver elimination.
+Grid position 0: Investigated and retained because it occurs in valid records.
+Race + qualifying merge: Joined using Year + Race + DriverId.
+Race round: Added chronological Round for each season.
+Data leakage: Avoided using information unavailable before the race.
+Target: Position — driver's final finishing position.
+ML features: GridPosition, QualifyingPosition, BestQualifyingTime, QualifyingTimeGap, PreviousRaceFinish, DriverHistoricalAvgFinish, DriverRecentForm, TeamHistoricalAvgFinish.
+Historical features: Used shift(1) so the current race result cannot influence its own features.
+Team history: Corrected an initial leakage issue by calculating historical team performance race-by-race.
+PositionGain: Used for EDA only because it contains the target and would cause leakage.
+Time split: 2020–2023 train → 2024 validation → 2025 test.
+Imputation: Median imputation; fitted only on training data to avoid leakage.
+Baseline: Mean prediction; MAE 4.991, RMSE 5.756, R² ≈ 0.
+Linear Regression: MAE 2.998, RMSE 3.860, R² 0.550.
+Random Forest: MAE 3.320, RMSE 4.232, R² 0.459.
+XGBoost: MAE 3.170, RMSE 4.092, R² 0.495.
+Main finding: All real ML models beat the baseline on 2024 validation.
+Important lesson: More complex models do not automatically perform better.
+we'll use Linear Regression for the initial final test because it had the lowest validation MAE/RMSE and highest R² among our tested models.
+Using a time-based evaluation strategy, the Linear Regression model achieved an MAE of 3.436, RMSE of 4.327, and R² of 0.435 on the completely unseen 2025 test season.
