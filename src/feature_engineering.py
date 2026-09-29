@@ -238,6 +238,17 @@ def create_driver_race_dataset(race, qualifying):
         ["Q1", "Q2", "Q3"]
     ].min(axis=1)
 
+     # Gap to the fastest qualifying time in each race
+    pole_time = (
+        driver_race
+        .groupby(["Year", "Round"])["BestQualifyingTime"]
+        .transform("min")
+    )
+
+    driver_race["QualifyingTimeGap"] = (
+        driver_race["BestQualifyingTime"] - pole_time
+    )
+
     # Historical average finishing position
     driver_race["DriverHistoricalAvgFinish"] = (
         driver_race
@@ -245,6 +256,65 @@ def create_driver_race_dataset(race, qualifying):
         .transform(
             lambda x: x.shift(1).expanding().mean()
         )
+    )
+
+    # Average finishing position over the previous 3 races
+    driver_race["DriverRecentForm"] = (
+        driver_race
+        .groupby("DriverId")["Position"]
+        .transform(
+            lambda x: x.shift(1).rolling(
+                window=3,
+                min_periods=1
+            ).mean()
+        )
+    )
+
+    # Calculate average finishing position for each team in each race
+    team_race_performance = (
+        driver_race
+        .groupby(
+            ["Year", "Round", "TeamId"],
+            as_index=False
+        )["Position"]
+        .mean()
+        .rename(
+            columns={
+                "Position": "TeamRaceAvgFinish"
+            }
+        )
+    )
+
+    # Sort team race history chronologically
+    team_race_performance = team_race_performance.sort_values(
+        ["TeamId", "Year", "Round"]
+    ).copy()
+
+    # Calculate historical team average before the current race
+    team_race_performance["TeamHistoricalAvgFinish"] = (
+        team_race_performance
+        .groupby("TeamId")["TeamRaceAvgFinish"]
+        .transform(
+            lambda x: x.shift(1).expanding().mean()
+        )
+    )
+
+    # Keep only the information needed for merging
+    team_history = team_race_performance[
+        [
+            "Year",
+            "Round",
+            "TeamId",
+            "TeamHistoricalAvgFinish"
+        ]
+    ]
+
+    # Merge historical team performance back into driver-level data
+    driver_race = driver_race.merge(
+        team_history,
+        on=["Year", "Round", "TeamId"],
+        how="left",
+        validate="many_to_one"
     )
 
     return driver_race
@@ -259,17 +329,16 @@ if __name__ == "__main__":
     )
 
     print(
-    driver_race[
-        [
-            "Year",
-            "Round",
-            "Race",
-            "FullName",
-            "Position",
-            "PreviousRaceFinish",
-            "DriverHistoricalAvgFinish"
-        ]
-    ].head(30)
+        driver_race[
+            [
+                "Year",
+                "Round",
+                "Race",
+                "FullName",
+                "BestQualifyingTime",
+                "QualifyingTimeGap"
+            ]
+        ].head(20)
     )
 
     output_file = (
