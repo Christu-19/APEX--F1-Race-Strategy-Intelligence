@@ -3,94 +3,286 @@ from pathlib import Path
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-
 PROCESSED_DATA_DIR = PROJECT_DIR / "data" / "processed"
 
 
-# Load cleaned datasets
-race = pd.read_csv(
-    PROCESSED_DATA_DIR / "cleaned_race_results.csv"
-)
+RACE_ORDER = {
+    2020: [
+        "austrian grand prix",
+        "styrian grand prix",
+        "hungarian grand prix",
+        "british grand prix",
+        "70th anniversary grand prix",
+        "spanish grand prix",
+        "belgian grand prix",
+        "italian grand prix",
+        "tuscan grand prix",
+        "russian grand prix",
+        "eifel grand prix",
+        "portuguese grand prix",
+        "emilia romagna grand prix",
+        "turkish grand prix",
+        "bahrain grand prix",
+        "sakhir grand prix",
+        "abu dhabi grand prix"
+    ],
 
-qualifying = pd.read_csv(
-    PROCESSED_DATA_DIR / "cleaned_qualifying_results.csv"
-)
+    2021: [
+        "bahrain grand prix",
+        "emilia romagna grand prix",
+        "portuguese grand prix",
+        "spanish grand prix",
+        "monaco grand prix",
+        "azerbaijan grand prix",
+        "french grand prix",
+        "styrian grand prix",
+        "austrian grand prix",
+        "british grand prix",
+        "hungarian grand prix",
+        "belgian grand prix",
+        "dutch grand prix",
+        "italian grand prix",
+        "russian grand prix",
+        "turkish grand prix",
+        "united states grand prix",
+        "mexico city grand prix",
+        "são paulo grand prix",
+        "qatar grand prix",
+        "saudi arabian grand prix",
+        "abu dhabi grand prix"
+    ],
 
+    2022: [
+        "bahrain grand prix",
+        "saudi arabian grand prix",
+        "australian grand prix",
+        "emilia romagna grand prix",
+        "miami grand prix",
+        "spanish grand prix",
+        "monaco grand prix",
+        "azerbaijan grand prix",
+        "canadian grand prix",
+        "british grand prix",
+        "austrian grand prix",
+        "french grand prix",
+        "hungarian grand prix",
+        "belgian grand prix",
+        "dutch grand prix",
+        "italian grand prix",
+        "singapore grand prix",
+        "japanese grand prix",
+        "united states grand prix",
+        "mexico city grand prix",
+        "são paulo grand prix",
+        "abu dhabi grand prix"
+    ],
 
-print("Race data loaded:", race.shape)
-print("Qualifying data loaded:", qualifying.shape)
+    2023: [
+        "bahrain grand prix",
+        "saudi arabian grand prix",
+        "australian grand prix",
+        "azerbaijan grand prix",
+        "miami grand prix",
+        "monaco grand prix",
+        "spanish grand prix",
+        "canadian grand prix",
+        "austrian grand prix",
+        "british grand prix",
+        "hungarian grand prix",
+        "belgian grand prix",
+        "dutch grand prix",
+        "italian grand prix",
+        "singapore grand prix",
+        "japanese grand prix",
+        "qatar grand prix",
+        "united states grand prix",
+        "mexico city grand prix",
+        "são paulo grand prix",
+        "las vegas grand prix",
+        "abu dhabi grand prix"
+    ],
 
-# Select qualifying features
-qualifying_features = qualifying[
-    [
-        "Year",
-        "Race",
-        "DriverId",
-        "Position",
-        "Q1",
-        "Q2",
-        "Q3"
+    2024: [
+        "bahrain grand prix",
+        "saudi arabian grand prix",
+        "australian grand prix",
+        "japanese grand prix",
+        "chinese grand prix",
+        "miami grand prix",
+        "emilia romagna grand prix",
+        "monaco grand prix",
+        "canadian grand prix",
+        "spanish grand prix",
+        "austrian grand prix",
+        "british grand prix",
+        "hungarian grand prix",
+        "belgian grand prix",
+        "dutch grand prix",
+        "italian grand prix",
+        "azerbaijan grand prix",
+        "singapore grand prix",
+        "united states grand prix",
+        "mexico city grand prix",
+        "são paulo grand prix",
+        "las vegas grand prix",
+        "qatar grand prix",
+        "abu dhabi grand prix"
+    ],
+
+    2025: [
+        "australian grand prix",
+        "chinese grand prix",
+        "japanese grand prix",
+        "bahrain grand prix",
+        "saudi arabian grand prix",
+        "miami grand prix",
+        "emilia romagna grand prix",
+        "monaco grand prix",
+        "spanish grand prix",
+        "canadian grand prix",
+        "austrian grand prix",
+        "british grand prix",
+        "belgian grand prix",
+        "hungarian grand prix",
+        "dutch grand prix",
+        "italian grand prix",
+        "azerbaijan grand prix",
+        "singapore grand prix",
+        "united states grand prix",
+        "mexico city grand prix",
+        "são paulo grand prix",
+        "las vegas grand prix",
+        "qatar grand prix",
+        "abu dhabi grand prix"
     ]
-].copy()
+}
 
+# chronological race round
+def add_race_round(df):
 
-qualifying_features= qualifying_features.rename(
-    columns={
-        "Position":"QualifyingPosition"
-    }
-)
+    df = df.copy()
 
-print(qualifying_features.columns.to_list())
+    df["Round"] = df.apply(
+        lambda row: RACE_ORDER[row["Year"]].index(row["Race"]) + 1,
+        axis=1
+    )
 
-# Remove qualifying records without a DriverId
-qualifying_features = qualifying_features.dropna(
-    subset=["DriverId"]
-)
+    return df
 
-print("\nQualifying features after removing missing DriverId:")
-print("Rows:", len(qualifying_features))
-print("Missing DriverId:", qualifying_features["DriverId"].isna().sum())
+# load data
+def load_data():
 
-# Merge qualifying data with race results
-driver_race = race.merge(
-    qualifying_features,
-    on=["Year", "Race", "DriverId"],
-    how="left",
-    validate="one_to_one"
-)
+    race = pd.read_csv(
+        PROCESSED_DATA_DIR / "cleaned_race_results.csv"
+    )
 
-print("\nMerged driver-race dataset:")
-print("Rows:", len(driver_race))
-print("Columns:", len(driver_race.columns))
+    qualifying = pd.read_csv(
+        PROCESSED_DATA_DIR / "cleaned_qualifying_results.csv"
+    )
 
-# Create best qualifying lap time
-driver_race["BestQualifyingTime"] = driver_race[
-    ["Q1", "Q2", "Q3"]
-].min(axis=1)
+    return race, qualifying
 
-print("\nBest qualifying time created.")
+# Merge dataset
+def create_driver_race_dataset(race, qualifying):
 
-print(
-    driver_race[
+    # Select qualifying features
+    qualifying_features = qualifying[
         [
-            "FullName",
-            "QualifyingPosition",
+            "Year",
+            "Race",
+            "DriverId",
+            "Position",
             "Q1",
             "Q2",
-            "Q3",
-            "BestQualifyingTime"
+            "Q3"
         ]
-    ].head()
-)
+    ].copy()
 
-# Save dataset
-output_file = PROCESSED_DATA_DIR / "driver_race_features.csv"
+    # Rename qualifying position
+    qualifying_features = qualifying_features.rename(
+        columns={
+            "Position": "QualifyingPosition"
+        }
+    )
 
-driver_race.to_csv(
-    output_file,
-    index=False
-)
+    # Remove records without DriverId
+    qualifying_features = qualifying_features.dropna(
+        subset=["DriverId"]
+    )
 
-print("\nFeature-engineered dataset saved.")
-print("Output:", output_file)
-print("Final shape:", driver_race.shape)
+    # Merge race and qualifying data
+    driver_race = race.merge(
+        qualifying_features,
+        on=["Year", "Race", "DriverId"],
+        how="left",
+        validate="one_to_one"
+    )
+
+    # Add chronological race round
+    driver_race = add_race_round(driver_race)
+
+    # Sort chronologically
+    driver_race = driver_race.sort_values(
+        ["Year", "Round"]
+    ).copy()
+
+    # Previous race finishing position
+    driver_race["PreviousRaceFinish"] = (
+        driver_race
+        .groupby("DriverId")["Position"]
+        .shift(1)
+    )
+
+    # Best qualifying lap time
+    driver_race["BestQualifyingTime"] = driver_race[
+        ["Q1", "Q2", "Q3"]
+    ].min(axis=1)
+
+    # Historical average finishing position
+    driver_race["DriverHistoricalAvgFinish"] = (
+        driver_race
+        .groupby("DriverId")["Position"]
+        .transform(
+            lambda x: x.shift(1).expanding().mean()
+        )
+    )
+
+    return driver_race
+
+if __name__ == "__main__":
+
+    race, qualifying = load_data()
+
+    driver_race = create_driver_race_dataset(
+        race,
+        qualifying
+    )
+
+    print(
+    driver_race[
+        [
+            "Year",
+            "Round",
+            "Race",
+            "FullName",
+            "Position",
+            "PreviousRaceFinish",
+            "DriverHistoricalAvgFinish"
+        ]
+    ].head(30)
+    )
+
+    output_file = (
+        PROCESSED_DATA_DIR /
+        "driver_race_features.csv"
+    )
+
+    driver_race.to_csv(
+        output_file,
+        index=False
+    )
+
+    print("Feature engineering completed.")
+    print(f"Rows: {len(driver_race)}")
+    print(f"Columns: {len(driver_race.columns)}")
+    print(f"Saved to: {output_file}")
